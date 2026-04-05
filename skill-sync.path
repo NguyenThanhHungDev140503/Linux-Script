@@ -1,0 +1,10 @@
+[Unit]
+Description=Monitor %S skill-sync source for changes
+PartOf=skill-sync.service
+
+[Path]
+DirectoryNotEmpty=__SRC_PATH__
+Unit=skill-sync.service
+
+[Install]
+WantedBy=multi-user.target

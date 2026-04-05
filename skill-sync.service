@@ -1,0 +1,9 @@
+[Unit]
+Description=Auto sync OpenCode skills to Google Drive
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/skill-sync.sh --once
+RemainAfterExit=no
+Restart=no
