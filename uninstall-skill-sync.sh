@@ -5,20 +5,47 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-if [ -z "$1" ]; then
-  echo "Usage: sudo ./uninstall-skill-sync.sh <service-name>"
-  echo "Vi du: sudo ./uninstall-skill-sync.sh opencode-skill-sync"
-  exit 1
+echo "=== Go cai dat Skill Sync Service ==="
+
+configs=$(ls /etc/*skill-sync*.conf 2>/dev/null)
+
+if [ -z "$configs" ]; then
+    echo "Khong tim thay service nao duoc cai dat boi script nay."
+    exit 0
 fi
 
-SERVICE_NAME="$1"
+declare -a SERVICES
+index=1
+
+echo ""
+echo "=== Cac service da cai dat ==="
+while IFS= read -r config; do
+    service_name=$(basename "$config" .conf)
+    SERVICES[$index]=$service_name
+    echo "  $index) $service_name"
+    index=$((index + 1))
+done <<< "$configs"
+
+echo ""
+read -p "Chon service muon go cai (1-$((index - 1))) hoac 'q' de thoat: " choice
+
+if [ "$choice" = "q" ] || [ "$choice" = "Q" ]; then
+    echo "Huy bo."
+    exit 0
+fi
+
+if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -ge "$index" ]; then
+    echo "Lua chon khong hop le."
+    exit 1
+fi
+
+SERVICE_NAME="${SERVICES[$choice]}"
 SERVICE_FILE="${SERVICE_NAME}.service"
 PATH_FILE="${SERVICE_NAME}.path"
 CONFIG_FILE="/etc/${SERVICE_NAME}.conf"
 
-echo "=== Go cai dat Skill Sync Service ==="
-echo "Service: $SERVICE_FILE"
-echo "Path: $PATH_FILE"
+echo ""
+echo "Service: $SERVICE_NAME"
 echo "Config: $CONFIG_FILE"
 
 read -p "Ban co chan chan muon go cai dat? [y/N]: " CONFIRM
@@ -47,8 +74,8 @@ systemctl daemon-reload
 systemctl reset-failed
 
 echo "-> Xoa cron entry..."
-CRON_LINE="/usr/local/bin/skill-sync.sh.*--config $CONFIG_FILE"
 (crontab -l 2>/dev/null | grep -v "$CONFIG_FILE") | crontab -
 
+echo ""
 echo "=== Hoan tat! ==="
 echo "Da go cac thanh phan cua $SERVICE_NAME"
