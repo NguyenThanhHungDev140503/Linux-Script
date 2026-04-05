@@ -1,0 +1,3 @@
+# Format: SERVICE_NAME|CONFIG_PATH
+# Example:
+# opencode-skill-sync|/etc/opencode-skill-sync.conf

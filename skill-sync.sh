@@ -54,7 +54,7 @@ sync_once() {
 
     if [ ! -d "$DEST" ] || [ ! -w "$DEST" ]; then
         echo "[WARN] DEST chua san sang (khong ton tai hoac khong ghi duoc): $DEST" | tee -a "$LOG_FILE"
-        return 0
+        return 1
     fi
 
     if [ "$DELETE_ON_SYNC" = true ]; then
@@ -66,16 +66,18 @@ sync_once() {
     $RSYNC_CMD "$SRC"/ "$DEST"/ >>"$LOG_FILE" 2>&1
     if [ $? -eq 0 ]; then
         echo "[OK] Sync hoan tat." | tee -a "$LOG_FILE"
+        return 0
     else
         echo "[ERROR] Sync loi." | tee -a "$LOG_FILE"
+        return 1
     fi
 }
 
-mkdir -p "$SRC" "$DEST"
+mkdir -p "$SRC"
 
 if [ "$ONCE_MODE" = true ]; then
     sync_once
-    exit 0
+    exit $?
 fi
 
 sync_once

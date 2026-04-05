@@ -7,9 +7,24 @@ fi
 
 echo "=== Cai dat Skill Auto Sync Service ==="
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALLED_FILE="$SCRIPT_DIR/installed-services.txt"
 SCRIPT_NAME="skill-sync.sh"
 
+SUDO_USER="${SUDO_USER:-$(whoami)}"
+SUDO_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+
 read -p "Nhap ten service (vi du: skill-sync-doc): " SERVICE_NAME
+
+if [ -f "$INSTALLED_FILE" ] && grep -q "^${SERVICE_NAME}|" "$INSTALLED_FILE" 2>/dev/null; then
+    echo "[WARN] Service '$SERVICE_NAME' da ton tai trong he thong."
+    read -p "Ban co muon ghi de? [y/N]: " OVERWRITE
+    if [ "$OVERWRITE" != "y" ] && [ "$OVERWRITE" != "Y" ]; then
+        echo "Huy bo cai dat."
+        exit 0
+    fi
+fi
+
 SERVICE_FILE="${SERVICE_NAME}.service"
 PATH_FILE="${SERVICE_NAME}.path"
 CONFIG_FILE="/etc/${SERVICE_NAME}.conf"
@@ -56,8 +71,33 @@ systemctl enable "$SERVICE_FILE"
 
 echo "-> Cai dat cron backup (5 phut)..."
 CRON_JOB="*/5 * * * * /usr/local/bin/skill-sync.sh --once --config $CONFIG_FILE"
-( crontab -l 2>/dev/null | grep -v "$CONFIG_FILE" ; echo "$CRON_JOB" ) | crontab -
+su - "$SUDO_USER" -c "crontab -l 2>/dev/null | grep -v '$CONFIG_FILE' ; echo '$CRON_JOB' | crontab -"
 
+echo "-> Luu vao installed-services.txt..."
+echo "${SERVICE_NAME}|${CONFIG_FILE}" >> "$INSTALLED_FILE"
+
+echo "-> Kiem tra sync lan dau..."
+if ! /usr/local/bin/skill-sync.sh --once --config "$CONFIG_FILE"; then
+    echo ""
+    echo "[ERROR] Sync lan dau that bai. Vui long kiem tra:"
+    echo "  - DEST co ton tai khong: $DEST"
+    echo "  - Google Drive da duoc mount chua?"
+    echo ""
+    read -p "Ban co van muon tiep tuc cau hinh service? [y/N]: " CONTINUE
+    if [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ]; then
+        echo "-> Huy bo va don dep..."
+        systemctl stop "$SERVICE_FILE" "$PATH_FILE" 2>/dev/null
+        systemctl disable "$SERVICE_FILE" "$PATH_FILE" 2>/dev/null
+        rm -f /etc/systemd/system/"$SERVICE_FILE"
+        rm -f /etc/systemd/system/"$PATH_FILE"
+        rm -f "$CONFIG_FILE"
+        systemctl daemon-reload 2>/dev/null
+        echo "[OK] Da huy bo hoan toan."
+        exit 1
+    fi
+fi
+
+echo ""
 echo "=== Hoan tat! ==="
 echo "Service: $SERVICE_FILE"
 echo "Path unit: $PATH_FILE"
@@ -65,8 +105,10 @@ echo "Config: $CONFIG_FILE"
 echo "SRC: $SRC"
 echo "DEST: $DEST"
 echo "DELETE_ON_SYNC: $DELETE_ON_SYNC"
+echo "Cron user: $SUDO_USER"
 echo ""
 echo "Lenh kiem tra:"
 echo "  systemctl status $PATH_FILE"
 echo "  systemctl status $SERVICE_FILE"
 echo "  sudo journalctl -u $SERVICE_FILE -f"
+echo "  crontab -l | grep skill-sync"
